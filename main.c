@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 #include <errno.h>
 #include <stdnoreturn.h>
 
@@ -10,73 +11,126 @@ static const size_t SET_DEFAULT_SIZE = 32;
 
 noreturn inline static void _panic(const char *file_name, const char *function_name, int line_number, const char *msg) {
 	fprintf(stderr, "PANIC: %s@%s:%d\t%s\n", function_name, file_name,line_number, msg);
+	exit(EXIT_FAILURE);
 }
 
 #define panic(msg) \
 do { \
 	_panic(__FILE__, __func__, __LINE__, msg); \
-	exit(EXIT_FAILURE);
 } while (0)
 
-typedef struct set_t {
-	//maps a character value to a flag to state whether it has been encountered
-	//	0 -	character, represented by index, has not been encountered
-	//	1	-	character, represented by index, has been encountered before
-	bool set_map[255];
+typedef struct multi_set {
 	size_t count;
 	size_t capacity;
 	char *set;
+} multi_set;
+
+typedef struct unique_set {
+	multi_set super;
+	size_t set_map[255];
+} unique_set;
+
+typedef struct set_t {
+	union {
+		unique_set unique;
+		multi_set multi;
+	} *p_set;
+	enum {
+		SET_TYPE_UNIQUE,
+		SET_TYPE_MULTI,
+	} type;
 } set_t;
 
 static set_t g_original;
 static set_t g_replacement;
 
-static inline void set_init(set_t* this) {
-	memset(this->set_map, 0, sizeof(this->set_map));
-	this->count = 0;
-	this->capacity = SET_DEFAULT_SIZE;
-	this->set = malloc(this->capacity);
+static void set_init(set_t *this) {
+	multi_set *p_set = malloc(sizeof(*this->p_set));
+
+	if (p_set == NULL) {
+		panic("failed to allocate set_t");
+	}
+	this->p_set = (set_t*) p_set;
+
+	p_set->count = 0;
+	p_set->capacity = SET_DEFAULT_SIZE;
+	p_set->set = malloc(p_set->capacity);
+
+	this->type = SET_TYPE_MULTI;
 }
 
+static void set_init_unique(set_t *this) {
+	unique_set *p_set;
+	set_init(this);
+	p_set = &this->p_set->unique;
+	this->type = SET_TYPE_UNIQUE;
+	memset(p_set->set_map, -1, sizeof(p_set->set_map));
+}
+
+static void set_free(set_t *this) {
+	free(this->p_set->multi.set);
+	free(this->p_set);
+}
 static void set_insert_str(set_t* this, const char *p_list, const size_t list_size) {
-		for (int i = 0; i < list_size; i++) {
-			char next_char = p_list[i];
+	unique_set *unique = &this->p_set->unique;
+	multi_set *multi = &this->p_set->multi;
+
+	for (int i = 0; i < list_size; i++) {
+		char next_char = p_list[i];
+
+		if (this->type == SET_TYPE_UNIQUE) {
 			//check if next_hcar has been in the list yet
-			if (this->set_map[next_char] == false) {
+			if (unique->set_map[next_char] == -1) {
 				//it hasn't, mark it visited
-				this->set_map[next_char] = true;
-
-				//check if a the set needs to grow
-				this->count++;
-				if (this->count >= this->capacity) {
-					char *old_set = this->set;
-					size_t new_capacity = this->capacity * 2;
-
-					//check for overflow
-					if (new_capacity > this->capacity) {
-						this->capacity = new_capacity;
-					} else {
-						panic("ran out of memory");
-					}
-
-					this->set = realloc(this->set, this->capacity);
-					if (this->set == NULL) {
-						panic("realloc failed");
-					}
-				}
-
-				//do insertion
-				this->set[this->count] = next_char;
+				unique->set_map[next_char] = multi->count;
+			} else {
+				continue;
 			}
 		}
+
+		//check if a the set needs to grow
+		if (multi->count >= multi->capacity) {
+			char *old_set = multi->set;
+			size_t new_capacity = multi->capacity * 2;
+
+			//check for overflow
+			if (new_capacity > multi->capacity) {
+				multi->capacity = new_capacity;
+			} else {
+				panic("ran out of memory");
+			}
+
+			multi->set = realloc(multi->set, multi->capacity);
+			if (multi->set == NULL) {
+				panic("realloc failed");
+			}
+		}
+
+		//do insertion
+		multi->set[multi->count++] = next_char;
+	}
 }
 
-static inline bool set_includes_char(const set_t *this, const char query) {
-	return this->set_map[query];
+static inline size_t set_find_char(const set_t *this, const char query) {
+	if (this->type == SET_TYPE_UNIQUE) {
+		return this->p_set->unique.set_map[query];
+	} else {
+		char *swp = memchr(this->p_set->multi.set, query, this->p_set->multi.count);
+		if (swp == NULL) {
+			return -1;
+		} else {
+			return swp - this->p_set->multi.set;
+		}
+	}
 }
 
 static char set_get(const set_t *this, size_t index) {
+	multi_set *p_set = &this->p_set->multi;
 
+	if (index >= p_set->count) {
+		index = p_set->count - 1;
+	}
+	return p_set->set[index];
 }
 
 noreturn void print_usage(const char *program_name) {
@@ -104,13 +158,16 @@ noreturn void tr() {
 
 	buffer = fgetc(stdin);
 	while (!feof(stdin)) {
-		if (buffer == g_original_char) {
-			fputc(g_replacement_char, stdout);
+		size_t idx = set_find_char(&g_original, buffer);
+		if (idx != -1) {
+			fputc(set_get(&g_replacement, idx), stdout);
 		} else {
 			fputc(buffer, stdout);
 		}
 		buffer = fgetc(stdin);
 	}
+	set_free(&g_original);
+	set_free(&g_replacement);
 	exit(EXIT_SUCCESS);
 }
 
