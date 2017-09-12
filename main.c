@@ -50,7 +50,7 @@ static void set_init(set_t *this) {
 	if (p_set == NULL) {
 		panic("failed to allocate set_t");
 	}
-	this->p_set = (set_t*) p_set;
+	this->p_set = (void*) p_set;
 
 	p_set->count = 0;
 	p_set->capacity = SET_DEFAULT_SIZE;
