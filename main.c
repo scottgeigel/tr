@@ -79,13 +79,8 @@ static void set_insert_str(set_t* this, const char *p_list, const size_t list_si
 		char next_char = p_list[i];
 
 		if (this->type == SET_TYPE_UNIQUE) {
-			//check if next_hcar has been in the list yet
-			if (unique->set_map[next_char] == -1) {
-				//it hasn't, mark it visited
-				unique->set_map[next_char] = multi->count;
-			} else {
-				continue;
-			}
+			//check if next_char has been in the list yet
+			unique->set_map[next_char] = multi->count;
 		}
 
 		//check if a the set needs to grow
@@ -146,7 +141,7 @@ void check_args(int argc, const char *argv[]) {
 		printf("%s requires exactly 2 arguments\n\n", argv[0]);
 		print_usage(argv[0]);
 	} else {
-		set_init(&g_original);
+		set_init_unique(&g_original);
 		set_init(&g_replacement);
 		set_insert_str(&g_original, argv[1], strlen(argv[1]));
 		set_insert_str(&g_replacement, argv[2], strlen(argv[2]));
