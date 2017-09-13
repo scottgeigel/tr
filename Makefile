@@ -1,5 +1,5 @@
 program_name="tr"
-c_flags="-Weverything"
+c_flags=--std=c11 -Weverything
 
 debug:
 	clang $(c_flags) -ggdb -o tr main.c

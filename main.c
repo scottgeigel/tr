@@ -6,8 +6,9 @@
 #include <errno.h>
 #include <stdnoreturn.h>
 
-const char version[] = "0.2";
+static const char g_version[] = "0.2";
 static const size_t SET_DEFAULT_SIZE = 32;
+static const size_t FIND_NPOS = ((size_t) -1);
 
 noreturn inline static void _panic(const char *file_name, const char *function_name, int line_number, const char *msg) {
 	fprintf(stderr, "PANIC: %s@%s:%d\t%s\n", function_name, file_name,line_number, msg);
@@ -75,17 +76,17 @@ static void set_insert_str(set_t* this, const char *p_list, const size_t list_si
 	unique_set *unique = &this->p_set->unique;
 	multi_set *multi = &this->p_set->multi;
 
-	for (int i = 0; i < list_size; i++) {
-		char next_char = p_list[i];
+	for (size_t i = 0; i < list_size; i++) {
+		char next_char =  p_list[i];
+		size_t lookup_idx = (size_t) p_list[i];
 
 		if (this->type == SET_TYPE_UNIQUE) {
 			//check if next_char has been in the list yet
-			unique->set_map[next_char] = multi->count;
+			unique->set_map[lookup_idx] = multi->count;
 		}
 
 		//check if a the set needs to grow
 		if (multi->count >= multi->capacity) {
-			char *old_set = multi->set;
 			size_t new_capacity = multi->capacity * 2;
 
 			//check for overflow
@@ -108,13 +109,13 @@ static void set_insert_str(set_t* this, const char *p_list, const size_t list_si
 
 static inline size_t set_find_char(const set_t *this, const char query) {
 	if (this->type == SET_TYPE_UNIQUE) {
-		return this->p_set->unique.set_map[query];
+		return this->p_set->unique.set_map[(size_t) query];
 	} else {
 		char *swp = memchr(this->p_set->multi.set, query, this->p_set->multi.count);
 		if (swp == NULL) {
-			return -1;
+			return FIND_NPOS;
 		} else {
-			return swp - this->p_set->multi.set;
+			return (size_t) (swp - this->p_set->multi.set);
 		}
 	}
 }
@@ -136,6 +137,11 @@ noreturn void print_usage(const char *program_name) {
 	exit(EXIT_SUCCESS);
 }
 
+noreturn void print_version(const char *program_name) {
+	printf("%s version %s  by Scott Geigel (2017)\n", program_name, g_version);
+	exit(EXIT_SUCCESS);
+}
+
 void check_args(int argc, const char *argv[]) {
 	if (argc != 3) {
 		printf("%s requires exactly 2 arguments\n\n", argv[0]);
@@ -149,15 +155,15 @@ void check_args(int argc, const char *argv[]) {
 }
 
 noreturn void tr() {
-	char buffer;
+	int buffer;
 
 	buffer = fgetc(stdin);
 	while (!feof(stdin)) {
-		size_t idx = set_find_char(&g_original, buffer);
-		if (idx != -1) {
+		size_t idx = set_find_char(&g_original, (char) buffer);
+		if (idx != FIND_NPOS) {
 			fputc(set_get(&g_replacement, idx), stdout);
 		} else {
-			fputc(buffer, stdout);
+			fputc((char) buffer, stdout);
 		}
 		buffer = fgetc(stdin);
 	}
@@ -169,5 +175,4 @@ noreturn void tr() {
 int main (int argc, char *argv[]) {
 	check_args(argc, (const char **) argv);
 	tr();
-	exit(EXIT_FAILURE);
 }
