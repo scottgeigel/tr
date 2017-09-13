@@ -6,7 +6,7 @@
 #include <errno.h>
 #include <stdnoreturn.h>
 
-const char version[] = "0.1";
+const char version[] = "0.2";
 static const size_t SET_DEFAULT_SIZE = 32;
 
 noreturn inline static void _panic(const char *file_name, const char *function_name, int line_number, const char *msg) {
@@ -129,9 +129,9 @@ static char set_get(const set_t *this, size_t index) {
 }
 
 noreturn void print_usage(const char *program_name) {
-	printf("Usage: %s [original] [replacement]\n", program_name);
+	printf("Usage: %s [search set] [replacement set]\n", program_name);
 	printf("reads from STDIN and writes to STDOUT replacing any character\n");
-	printf("equal to [original] and replacing it with [replacement].\n");
+	printf("existing in [search set] and replacing it with [replacement set].\n");
 	printf("All other characters are output unaltered\n");
 	exit(EXIT_SUCCESS);
 }
