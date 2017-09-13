@@ -14,7 +14,7 @@ typedef struct multi_set {
 
 typedef struct unique_set {
 	multi_set super;
-	size_t set_map[255];
+	size_t set_map[256];
 } unique_set;
 
 typedef struct set_t {
@@ -173,7 +173,7 @@ static void set_insert_str(set_t* this, const char *p_list, const size_t list_si
 
 static inline size_t set_find_char(const set_t *this, const char query) {
 	if (this->type == SET_TYPE_UNIQUE) {
-		return this->p_set->unique.set_map[(size_t) query];
+		return this->p_set->unique.set_map[(size_t) (unsigned char) query];
 	} else {
 		char *swp = memchr(this->p_set->multi.set, query, this->p_set->multi.count);
 		if (swp == NULL) {
